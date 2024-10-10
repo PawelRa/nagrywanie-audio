@@ -3,9 +3,9 @@ from io import BytesIO
 from audiorecorder import audiorecorder  # type: ignore
 from dotenv import dotenv_values
 from openai import OpenAI
+from hashlib import md5
 
 ENV = dotenv_values(".env")
-
 AUDIO_TRANSCRIBE_MODEL = "whisper-1"
 
 def get_openai_client():
@@ -43,6 +43,9 @@ if not st.session_state.get("openai_api_key"):
     st.stop()
 
 # Sesion state initialization
+if "note_audio_bytes_md5" not in st.session_state:
+    st.session_state["note_audio_bytes_md5"] = None
+
 if "note_audio_bytes" not in st.session_state:
     st.session_state["note_audio_bytes"] = None
 
@@ -59,6 +62,11 @@ if note_audio:
     audio = BytesIO()
     note_audio.export(audio, format="mp3")
     st.session_state["note_audio_bytes"] = audio.getvalue()
+    current_md5 = md5(st.session_state["note_audio_bytes"]).hexdigest()
+    if st.session_state["note_audio_bytes_md5"] != current_md5:
+        st.session_state["note_audio_text"] = ""
+        st.session_state["note_audio_bytes_md5"] = current_md5        
+
     st.audio(st.session_state["note_audio_bytes"], format="audio/mp3")
 
     if st.button("Transkrybuj audio"):
