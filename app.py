@@ -8,9 +8,9 @@ ENV = dotenv_values(".env")
 
 AUDIO_TRANSCRIBE_MODEL = "whisper-1"
 
-@st.cache_resource
 def get_openai_client():
-    return OpenAI(api_key=ENV["OPENAI_API_KEY"])
+    return OpenAI(api_key=st.session_state["openai_api_key"])
+    # return OpenAI(api_key=ENV["OPENAI_API_KEY"])
 
 def transcribe_audio(audio_bytes):
     openai_client = get_openai_client()
@@ -20,7 +20,7 @@ def transcribe_audio(audio_bytes):
         file=audio_file,
         model=AUDIO_TRANSCRIBE_MODEL,
         response_format="verbose_json",
-    )
+    )    
     return transcript.text
 
 #
@@ -28,6 +28,21 @@ def transcribe_audio(audio_bytes):
 #
 st.set_page_config(page_title="Audio Notatki", layout="centered")
 
+# OpenAI APU key
+if not st.session_state.get("openai_api_key"):
+    if "OPENAI_API_KEY" in ENV:
+        st.session_state["openai_api_key"] = ENV["OPENAI_API_KEY"]
+
+    else:
+        st.info("Dodaj swój klucz API OpenAI, aby móc korzystać z tej aplikacji")
+        st.session_state["openai_api_key"] = st.text_input("Klucz API", type="password")
+        if st.session_state["openai_api_key"]:
+            st.rerun()
+
+if not st.session_state.get("openai_api_key"):
+    st.stop()
+
+# Sesion state initialization
 if "note_audio_bytes" not in st.session_state:
     st.session_state["note_audio_bytes"] = None
 
