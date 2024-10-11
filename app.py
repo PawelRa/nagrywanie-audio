@@ -30,6 +30,7 @@ def transcribe_audio(audio_bytes):
         model=AUDIO_TRANSCRIBE_MODEL,
         response_format="verbose_json",
     )    
+
     return transcript.text
 
 #
@@ -82,6 +83,33 @@ def add_note_to_db(note_text):
         ]
     )
 
+def list_notes_from_db(query=None):
+    qdrant_client = get_qdrant_client()
+    if not query:
+        notes = qdrant_client.scroll(collection_name=QDRANT_COLLECTION_NAME, limit=10)[0]
+        result = []
+        for note in notes:
+            result.append({
+                "text": note.payload["text"],
+                "score": None,
+            })
+
+        return result
+    
+    else:
+        notes = qdrant_client.search(
+            collection_name=QDRANT_COLLECTION_NAME,
+            query_vector=get_embedding(text=query),
+            limit=10,
+        )
+        result = []
+        for note in notes:
+            result.append({
+                "text": note.payload["text"],
+                "score": note.score,
+            })
+        return result
+
 #
 # MAIN
 #
@@ -116,28 +144,40 @@ if "note_audio_text" not in st.session_state:
 #Start
 st.title("Audio Notatki")
 assure_db_collection_exists()
-note_audio = audiorecorder(
-    start_prompt="Nagraj notatkę",
-    stop_prompt="Zatrzymaj nagrywanie",
-)
-if note_audio:
-    audio = BytesIO()
-    note_audio.export(audio, format="mp3")
-    st.session_state["note_audio_bytes"] = audio.getvalue()
-    current_md5 = md5(st.session_state["note_audio_bytes"]).hexdigest()
-    if st.session_state["note_audio_bytes_md5"] != current_md5:
-        st.session_state["note_audio_text"] = ""
-        st.session_state["note_audio_bytes_md5"] = current_md5        
+add_tab, search_tab = st.tabs(["Dodaj notatkę", "Wyszukaj notatkę"])
 
-    st.audio(st.session_state["note_audio_bytes"], format="audio/mp3")
+with add_tab:
+    note_audio = audiorecorder(
+        start_prompt="Nagraj notatkę",
+        stop_prompt="Zatrzymaj nagrywanie",
+    )
+    if note_audio:
+        audio = BytesIO()
+        note_audio.export(audio, format="mp3")
+        st.session_state["note_audio_bytes"] = audio.getvalue()
+        current_md5 = md5(st.session_state["note_audio_bytes"]).hexdigest()
+        if st.session_state["note_audio_bytes_md5"] != current_md5:
+            st.session_state["note_audio_text"] = ""
+            st.session_state["note_text"] = ""
+            st.session_state["note_audio_bytes_md5"] = current_md5        
 
-    if st.button("Transkrybuj audio"):
-        st.session_state["note_audio_text"] = transcribe_audio(st.session_state["note_audio_bytes"])
+        st.audio(st.session_state["note_audio_bytes"], format="audio/mp3")
 
-    if st.session_state["note_audio_text"]:
-        st.session_state["note_text"] = st.text_area("Edytuj notatkę", value=st.session_state["note_audio_text"])
+        if st.button("Transkrybuj audio"):
+            st.session_state["note_audio_text"] = transcribe_audio(st.session_state["note_audio_bytes"])
 
-    if st.session_state["note_text"] and st.button("Zapisz notatkę", disabled=not st.session_state["note_text"]):
-        add_note_to_db(note_text=st.session_state["note_text"])
-        st.toast("Notatka została zapisana", icon="🎉")
+        if st.session_state["note_audio_text"]:
+            st.session_state["note_text"] = st.text_area("Edytuj notatkę", value=st.session_state["note_audio_text"])
 
+        if st.session_state["note_text"] and st.button("Zapisz notatkę", disabled=not st.session_state["note_text"]):
+            add_note_to_db(note_text=st.session_state["note_text"])
+            st.toast("Notatka została zapisana", icon="🎉")
+
+with search_tab:
+    query = st.text_input("Wyszukaj notatkę")
+    if st.button("Szukaj"):
+        for note in list_notes_from_db(query):
+            with st.container(border=True):
+                st.markdown(note["text"])
+                if note["score"]:
+                    st.markdown(f':violet[{note["score"]}]')
