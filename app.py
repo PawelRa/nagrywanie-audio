@@ -38,7 +38,11 @@ def transcribe_audio(audio_bytes):
 #
 @st.cache_resource
 def get_qdrant_client():
-    return QdrantClient(path=":memory:")
+    qdrant_client = QdrantClient(
+    url=ENV["QDRANT_URL"], 
+    api_key=ENV["QDRANT_API_KEY"],
+    )
+    return qdrant_client
 
 def assure_db_collection_exists():
     qdrant_client = get_qdrant_client()
