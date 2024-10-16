@@ -8,6 +8,11 @@ from qdrant_client import QdrantClient
 from qdrant_client.models import PointStruct, Distance, VectorParams
 
 ENV = dotenv_values(".env")
+#streamlit Cloud
+if "QDRANT_URL" in st.secrets:
+        ENV["QDRANT_URL"] = st.secrets["QDRANT_URL"]
+if "QDRANT_API_KEY" in st.secrets:
+    ENV["OPENAI_API_KEY"] = st.secrets["QDRANT_API_KEY"]
 
 EMBEDDING_MODEL = "text-embedding-3-large"
 
